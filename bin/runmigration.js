@@ -12,6 +12,7 @@ let migrationsDir = path.join(process.env.PWD, 'migrations'),
 
 const optionDefinitions = [
     { name: 'rev', alias: 'r', type: Number, description: 'Set migration revision (default: 0)', defaultValue: 0 },
+    { name: 'skip', alias: 's', type: Boolean, description: 'skip one migration and log it', defaultValue: false },
     { name: 'pos', alias: 'p', type: Number, description: 'Run first migration at pos (default: 0)', defaultValue: 0 },
     { name: 'one', type: Boolean, description: 'Do not run next migrations', defaultValue: false },
     { name: 'list', alias: 'l', type: Boolean, description: 'Show migration file list (without execution)', defaultValue: false },
@@ -39,6 +40,9 @@ const queryInterface = sequelize.getQueryInterface();
 let fromRevision = options.rev;
 let fromPos = parseInt(options.pos);
 let stop = options.one;
+let skip = options.skip;
+let skipAll = options.skipAll;
+console.log(skip);
 
 var tableName = 'SequelizeMeta' ;
 var SequelizeMeta = sequelize.define(tableName, {
@@ -51,7 +55,8 @@ var SequelizeMeta = sequelize.define(tableName, {
     }
 });
 
-sequelize.query("CREATE TABLE `SequelizeMeta` (   `name` varchar(255) NOT NULL,   PRIMARY KEY (`name`),   UNIQUE KEY `name` (`name`),  UNIQUE KEY `SequelizeMeta_name_unique` (`name`) )");
+sequelize.query("CREATE TABLE IF NOT EXISTS `SequelizeMeta` (   `name` varchar(255) NOT NULL,   PRIMARY KEY (`name`),   " +
+                 "UNIQUE KEY `name` (`name`),  UNIQUE KEY `SequelizeMeta_name_unique` (`name`) )");
 
 var already_uploaded = [];
     sequelize.query("SELECT * FROM `SequelizeMeta`", { type: sequelize.QueryTypes.SELECT })
@@ -99,22 +104,32 @@ if (options.list)
 Async.eachSeries(migrationFiles,
     function (file, cb) {
         console.log("Execute migration from file: "+file);
-        migrate.executeMigration(queryInterface, path.join(migrationsDir, file), fromPos, (err) => {
-            if (stop)
+        if(skip){
+            sequelize.query("INSERT INTO SequelizeMeta (name ) VALUES ( ? )",
+                { replacements: [file] }).spread((results, metadata) => {
+            });
+            process.exit(0);
+        }else {
+            migrate.executeMigration(queryInterface, path.join(migrationsDir, file), fromPos, (err) => {
+                if (stop)
                 return cb("Stopped");
             if(!err){
-                sequelize.query("INSERT INTO SequelizeMeta (name ) VALUES ( ? )",
-                     { replacements: [file] }).spread((results, metadata) => {
-                });
+                console.log('all fine execute it now'); console.log(file);
+                sequelize.query("INSERT INTO SequelizeMeta (name ) VALUES ( '"+ file +"' )");
             }
             cb(err);
         });
+        }
+
         // set pos to 0 for next migration
         fromPos = 0;
     },
     function(err) {
         console.log(err);
-        process.exit(0);
+        setTimeout(function() {
+            process.exit(0);
+        }, 3000);
+
     }
 );
 });

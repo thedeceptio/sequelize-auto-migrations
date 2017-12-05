@@ -108,7 +108,9 @@ Async.eachSeries(migrationFiles,
             sequelize.query("INSERT INTO SequelizeMeta (name ) VALUES ( ? )",
                 { replacements: [file] }).spread((results, metadata) => {
             });
-            process.exit(0);
+            setTimeout(function() {
+                process.exit(0);
+            }, 3000);
         }else {
             migrate.executeMigration(queryInterface, path.join(migrationsDir, file), fromPos, (err) => {
                 if (stop)
@@ -120,7 +122,6 @@ Async.eachSeries(migrationFiles,
             cb(err);
         });
         }
-
         // set pos to 0 for next migration
         fromPos = 0;
     },
